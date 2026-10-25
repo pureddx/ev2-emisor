@@ -52,6 +52,11 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.*
 
+// ==========================================
+// 1. CAPA DE MODELOS (ENTIDADES DE ROOM)
+// ==========================================
+
+// Tabla de Usuarios: Almacena las credenciales y datos de contacto
 @Entity data class Usuario(
     @PrimaryKey val user: String,
     val pass: String,
@@ -60,6 +65,7 @@ import java.util.*
     val telefono: String
 )
 
+// Tabla de Alarmas: Guarda las horas, días de repetición, IP destino y el dueño
 @Entity data class Alarma(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val usuarioOwner: String,
@@ -69,12 +75,17 @@ import java.util.*
     val activa: Boolean = true
 )
 
+// Tabla de Historial (Auditoría): Registra las acciones críticas de cada usuario
 @Entity data class Historial(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val usuarioOwner: String,
     val descripcion: String,
     val fecha: String
 )
+
+// ==========================================
+// 2. CAPA DE ACCESO A DATOS (DAO)
+// ==========================================
 
 @Dao
 interface AppDao {
@@ -100,6 +111,10 @@ interface AppDao {
     @Query("SELECT * FROM Historial WHERE usuarioOwner = :u ORDER BY id DESC") suspend fun obtenerHistorial(u: String): List<Historial>
 }
 
+// ==========================================
+// 3. CONFIGURACIÓN DE LA BASE DE DATOS (ROOM)
+// ==========================================
+
 @Database(entities = [Usuario::class, Alarma::class, Historial::class], version = 15, exportSchema = false)
 abstract class AppDB : RoomDatabase() {
     abstract fun dao(): AppDao
@@ -110,11 +125,17 @@ abstract class AppDB : RoomDatabase() {
     }
 }
 
+// ==========================================
+// 4. FUNCIONES AUXILIARES (SEGURIDAD Y FECHA)
+// ==========================================
+
+// Cifra la contraseña utilizando el algoritmo SHA-256
 fun hashPassword(password: String): String {
     val bytes = MessageDigest.getInstance("SHA-256").digest(password.toByteArray())
     return bytes.joinToString("") { "%02x".format(it) }
 }
 
+// Valida que la contraseña cumpla con las políticas de seguridad (Mín. 6 caracteres, Mayúscula y Número)
 fun validarPasswordSegura(password: String): Boolean {
     val tieneMayuscula = password.any { it.isUpperCase() }
     val tieneMinuscula = password.any { it.isLowerCase() }
@@ -123,10 +144,15 @@ fun validarPasswordSegura(password: String): Boolean {
     return tieneMayuscula && tieneMinuscula && tieneNumero && esLargaSuficiente
 }
 
+// Obtiene la fecha y hora actual en formato de texto formateado
 fun obtenerFechaActual(): String {
     val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
     return sdf.format(Date())
 }
+
+// ==========================================
+// 5. ACTIVIDAD PRINCIPAL Y ENRUTAMIENTO (NAVHOST)
+// ==========================================
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -140,6 +166,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val nav = rememberNavController()
+                    // Configuración de las rutas de navegación entre pantallas
                     NavHost(navController = nav, startDestination = "login") {
                         composable("login") { LoginScreen(nav, dao) }
                         composable("registro") { RegistroScreen(nav, dao) }
@@ -158,6 +185,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// ==========================================
+// 6. PANTALLA DE INICIO DE SESIÓN (LOGIN)
+// ==========================================
+
 @Composable
 fun LoginScreen(nav: NavHostController, dao: AppDao) {
     var u by remember { mutableStateOf("") }
@@ -171,14 +202,14 @@ fun LoginScreen(nav: NavHostController, dao: AppDao) {
         modifier = Modifier
             .fillMaxSize()
             .systemBarsPadding()
-            .imePadding() // Empuja el contenido hacia arriba cuando sale el teclado
+            .imePadding() // Ajuste automático cuando se despliega el teclado virtual
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 520.dp), // Permite que la tarjeta se adapte y scrolle si hay teclado
+                .heightIn(max = 520.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
@@ -204,6 +235,7 @@ fun LoginScreen(nav: NavHostController, dao: AppDao) {
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 )
 
+                // Campo de contraseña con ocultación de caracteres y teclado seguro
                 OutlinedTextField(
                     value = p,
                     onValueChange = { p = it },
@@ -222,6 +254,7 @@ fun LoginScreen(nav: NavHostController, dao: AppDao) {
                     modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)
                 )
 
+                // Botón de autenticación contra la base de datos Room
                 Button(
                     onClick = {
                         scope.launch {
@@ -275,6 +308,10 @@ fun LoginScreen(nav: NavHostController, dao: AppDao) {
     }
 }
 
+// ==========================================
+// 7. PANTALLA DE REGISTRO DE NUEVOS USUARIOS
+// ==========================================
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegistroScreen(nav: NavHostController, dao: AppDao) {
@@ -304,14 +341,14 @@ fun RegistroScreen(nav: NavHostController, dao: AppDao) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .imePadding() // Empuja el contenido hacia arriba cuando sale el teclado
+                .imePadding()
                 .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 550.dp), // Altura adaptativa con scroll
+                    .heightIn(max = 550.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
@@ -379,6 +416,7 @@ fun RegistroScreen(nav: NavHostController, dao: AppDao) {
                         modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)
                     )
 
+                    // Validación y guardado del usuario en la base de datos local
                     Button(
                         onClick = {
                             val usuarioLimpio = u.trim()
@@ -397,6 +435,7 @@ fun RegistroScreen(nav: NavHostController, dao: AppDao) {
                                         if (existe != null) {
                                             Toast.makeText(ctx, "El usuario ya existe", Toast.LENGTH_SHORT).show()
                                         } else {
+                                            // Se registra el usuario cifrando la clave con SHA-256
                                             dao.registrarUser(Usuario(usuarioLimpio, hashPassword(p), nombreLimpio, emailLimpio, telLimpio))
                                             dao.insertarHistorial(Historial(usuarioOwner = usuarioLimpio, descripcion = "Cuenta creada exitosamente", fecha = obtenerFechaActual()))
                                             Toast.makeText(ctx, "Registrado con éxito", Toast.LENGTH_SHORT).show()
@@ -417,6 +456,10 @@ fun RegistroScreen(nav: NavHostController, dao: AppDao) {
         }
     }
 }
+
+// ==========================================
+// 8. MÓDULO DE RECUPERACIÓN Y AYUDA DE ACCESO
+// ==========================================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -451,14 +494,14 @@ fun ProblemasLoginScreen(dao: AppDao, nav: NavHostController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .imePadding() // Empuja el contenido hacia arriba cuando sale el teclado
+                .imePadding()
                 .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 550.dp), // Altura adaptativa con scroll
+                    .heightIn(max = 550.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
@@ -476,6 +519,7 @@ fun ProblemasLoginScreen(dao: AppDao, nav: NavHostController) {
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
+                    // Pestañas para alternar entre "Olvidé mi usuario" y "Olvidé mi contraseña"
                     TabRow(selectedTabIndex = selectedTab) {
                         Tab(
                             selected = selectedTab == 0,
@@ -492,6 +536,7 @@ fun ProblemasLoginScreen(dao: AppDao, nav: NavHostController) {
                     Spacer(modifier = Modifier.height(20.dp))
 
                     if (selectedTab == 0) {
+                        // Pestaña 1: Búsqueda de usuario por número de teléfono
                         OutlinedTextField(
                             value = telefonoBusqueda,
                             onValueChange = { telefonoBusqueda = it },
@@ -547,6 +592,7 @@ fun ProblemasLoginScreen(dao: AppDao, nav: NavHostController) {
                         }
 
                     } else {
+                        // Pestaña 2: Restablecimiento de contraseña
                         OutlinedTextField(
                             value = identificadorPass,
                             onValueChange = { identificadorPass = it },
@@ -616,6 +662,10 @@ fun ProblemasLoginScreen(dao: AppDao, nav: NavHostController) {
     }
 }
 
+// ==========================================
+// 9. PANEL PRINCIPAL DE CONTROL IOT Y GESTIÓN
+// ==========================================
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PanelScreen(dao: AppDao, usuarioActual: String, nav: NavHostController) {
@@ -638,6 +688,7 @@ fun PanelScreen(dao: AppDao, usuarioActual: String, nav: NavHostController) {
     val scope = rememberCoroutineScope()
     val esConexionValida = estadoConexion == "Conectado"
 
+    // Carga inicial de alarmas e historial asociados al usuario logueado
     LaunchedEffect(usuarioActual) {
         listaAlarmas = dao.obtenerAlarmas(usuarioActual)
         listaHistorial = dao.obtenerHistorial(usuarioActual)
@@ -695,6 +746,7 @@ fun PanelScreen(dao: AppDao, usuarioActual: String, nav: NavHostController) {
                 modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
                 contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
             ) {
+                // Tarjeta 1: Configuración y Prueba de Conexión IP (Socket Health Check)
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
@@ -754,6 +806,7 @@ fun PanelScreen(dao: AppDao, usuarioActual: String, nav: NavHostController) {
                     }
                 }
 
+                // Tarjeta 2: Programación de Alarma Horaria y Días de Repetición
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
@@ -818,6 +871,7 @@ fun PanelScreen(dao: AppDao, usuarioActual: String, nav: NavHostController) {
                     }
                 }
 
+                // Tarjeta 3: Envío de Comandos Directos por TCP al Hardware
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
@@ -869,6 +923,7 @@ fun PanelScreen(dao: AppDao, usuarioActual: String, nav: NavHostController) {
                     Text(text = "Mis Alarmas Guardadas", fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(bottom = 8.dp))
                 }
 
+                // Listado de alarmas filtradas por el usuario actual
                 if (listaAlarmas.isEmpty()) {
                     item { Text("No hay alarmas registradas.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 } else {
@@ -904,6 +959,7 @@ fun PanelScreen(dao: AppDao, usuarioActual: String, nav: NavHostController) {
                 }
             }
         } else {
+            // Pestaña de Historial de Auditoría
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
                 contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
@@ -933,6 +989,11 @@ fun PanelScreen(dao: AppDao, usuarioActual: String, nav: NavHostController) {
     }
 }
 
+// ==========================================
+// 10. FUNCIONES DE COMUNICACIÓN DE RED (TCP)
+// ==========================================
+
+// Envía comandos de texto plano mediante Sockets TCP hacia el hardware receptor (Puerto 8080)
 fun enviarComandoTCP(ip: String, comando: String) {
     try {
         val socket = Socket(ip, 8080)
@@ -941,6 +1002,7 @@ fun enviarComandoTCP(ip: String, comando: String) {
     } catch (_: Exception) {}
 }
 
+// Realiza una prueba rápida (Health Check) de conectividad con timeout de 1.5 segundos
 fun probarSocket(ip: String, puerto: Int): Boolean {
     return try {
         val socket = Socket()
